@@ -1054,11 +1054,7 @@ namespace TradingConsole.Wpf.ViewModels
                         decimal underlyingLtp = 0;
                         if (instrumentToUpdate.InstrumentType.StartsWith("OPT") || instrumentToUpdate.InstrumentType.StartsWith("FUT"))
                         {
-                            // Robust lookup for underlying instrument
-                            var underlyingInstrument = Dashboard.MonitoredInstruments.FirstOrDefault(i =>
-                                (i.InstrumentType == "INDEX" || i.InstrumentType == "EQUITY") &&
-                                i.UnderlyingSymbol.Replace(" ", "").Equals(instrumentToUpdate.UnderlyingSymbol.Replace(" ", ""), StringComparison.OrdinalIgnoreCase));
-
+                            var underlyingInstrument = FindUnderlyingInstrument(instrumentToUpdate);
                             if (underlyingInstrument != null)
                             {
                                 underlyingLtp = underlyingInstrument.LTP;
@@ -1523,21 +1519,7 @@ namespace TradingConsole.Wpf.ViewModels
                         decimal underlyingLtp = 0;
                         if (instrument.InstrumentType.StartsWith("OPT") || instrument.InstrumentType.StartsWith("FUT"))
                         {
-                            var underlyingInstrument = Dashboard.MonitoredInstruments.FirstOrDefault(i =>
-                            {
-                                if (i.InstrumentType != "INDEX" && i.InstrumentType != "EQUITY") return false;
-
-                                var derivativeUnderlying = instrument.UnderlyingSymbol.ToUpperInvariant();
-                                var potentialUnderlyingSymbol = i.Symbol;
-
-                                if (potentialUnderlyingSymbol == "Nifty 50" && derivativeUnderlying == "NIFTY") return true;
-                                if (potentialUnderlyingSymbol == "Nifty Bank" && derivativeUnderlying == "BANKNIFTY") return true;
-                                if (potentialUnderlyingSymbol == "Sensex" && derivativeUnderlying == "SENSEX") return true;
-
-                                // Fallback for stock derivatives
-                                return potentialUnderlyingSymbol.Replace(" ", "").ToUpperInvariant().Contains(derivativeUnderlying);
-                            });
-
+                            var underlyingInstrument = FindUnderlyingInstrument(instrument);
                             if (underlyingInstrument != null)
                             {
                                 underlyingLtp = underlyingInstrument.LTP;
@@ -1727,6 +1709,27 @@ namespace TradingConsole.Wpf.ViewModels
         private void RebuildPositionsMap()
         {
             _openPositionsMap = Portfolio.OpenPositions.ToDictionary(p => p.SecurityId);
+        }
+
+        // --- NEW HELPER METHOD ---
+        private DashboardInstrument? FindUnderlyingInstrument(DashboardInstrument derivative)
+        {
+            return Dashboard.MonitoredInstruments.FirstOrDefault(i =>
+            {
+                if (i.InstrumentType != "INDEX" && i.InstrumentType != "EQUITY")
+                    return false;
+
+                var derivativeUnderlying = derivative.UnderlyingSymbol.ToUpperInvariant();
+                var potentialUnderlyingSymbol = i.Symbol.ToUpperInvariant();
+
+                // Explicit mapping for known indices
+                if (potentialUnderlyingSymbol == "NIFTY 50" && derivativeUnderlying == "NIFTY") return true;
+                if (potentialUnderlyingSymbol == "NIFTY BANK" && derivativeUnderlying == "BANKNIFTY") return true;
+                if (potentialUnderlyingSymbol == "SENSEX" && derivativeUnderlying == "SENSEX") return true;
+
+                // Fallback for stocks (e.g., RELIANCE future should match RELIANCE stock)
+                return potentialUnderlyingSymbol == derivativeUnderlying;
+            });
         }
         #endregion
 
