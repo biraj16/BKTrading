@@ -65,7 +65,7 @@ namespace TradingConsole.Wpf.ViewModels
             IvRank = source.IvRank;
             IvPercentile = source.IvPercentile;
             IvTrendSignal = source.IvTrendSignal;
-            IvSkewSignal = source.IvSkewSignal; // ADDED
+            IvSkewSignal = source.IvSkewSignal;
             RsiValue1Min = source.RsiValue1Min;
             RsiSignal1Min = source.RsiSignal1Min;
             RsiValue5Min = source.RsiValue5Min;
@@ -94,6 +94,7 @@ namespace TradingConsole.Wpf.ViewModels
             IntradayContext = source.IntradayContext;
             MarketNarrative = source.MarketNarrative;
             FinalTradeSignal = source.FinalTradeSignal;
+            PrimarySignal = source.PrimarySignal; // ADDED
             ConvictionScore = source.ConvictionScore;
             BullishDrivers = source.BullishDrivers;
             BearishDrivers = source.BearishDrivers;
@@ -137,8 +138,8 @@ namespace TradingConsole.Wpf.ViewModels
         private decimal _currentIv;
         private decimal _avgIv;
         private string _ivSignal = "N/A";
-        private string _ivSkewSignal = "N/A"; // ADDED
-        public string IvSkewSignal { get => _ivSkewSignal; set => SetProperty(ref _ivSkewSignal, value); } // ADDED
+        private string _ivSkewSignal = "N/A";
+        public string IvSkewSignal { get => _ivSkewSignal; set => SetProperty(ref _ivSkewSignal, value); }
 
         private decimal _rsiValue1Min;
         public decimal RsiValue1Min { get => _rsiValue1Min; set => SetProperty(ref _rsiValue1Min, value); }
@@ -236,6 +237,11 @@ namespace TradingConsole.Wpf.ViewModels
 
         private string _finalTradeSignal = "Analyzing...";
         public string FinalTradeSignal { get => _finalTradeSignal; set => SetProperty(ref _finalTradeSignal, value); }
+
+        // --- ADDED: A more stable signal for notification purposes ---
+        private string _primarySignal = "Neutral";
+        public string PrimarySignal { get => _primarySignal; set => SetProperty(ref _primarySignal, value); }
+
 
         private decimal _stopLoss;
         public decimal StopLoss { get => _stopLoss; set => SetProperty(ref _stopLoss, value); }

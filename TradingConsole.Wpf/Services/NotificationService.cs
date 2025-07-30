@@ -25,7 +25,8 @@ namespace TradingConsole.Wpf.Services
         /// Sends a formatted trade signal notification to a Telegram chat via a bot.
         /// </summary>
         /// <param name="result">The analysis result containing the signal to send.</param>
-        public async Task SendTelegramSignalAsync(AnalysisResult result)
+        /// <param name="oldPrimarySignal">The previous primary signal state to determine if it's an entry or exit.</param>
+        public async Task SendTelegramSignalAsync(AnalysisResult result, string oldPrimarySignal)
         {
             // Check if notifications are enabled and credentials are set
             if (!_settingsViewModel.IsTelegramNotificationEnabled ||
@@ -37,8 +38,35 @@ namespace TradingConsole.Wpf.Services
 
             // Construct the message using Markdown for formatting
             var messageBuilder = new StringBuilder();
-            messageBuilder.AppendLine($"*{result.FinalTradeSignal}*");
+            string title;
+
+            // --- NEW LOGIC for Entry/Exit/Reversal Titles ---
+            if (result.PrimarySignal == "Bullish" && oldPrimarySignal != "Bullish")
+            {
+                title = $"*ENTRY SIGNAL: Go Long*";
+            }
+            else if (result.PrimarySignal == "Bearish" && oldPrimarySignal != "Bearish")
+            {
+                title = $"*ENTRY SIGNAL: Go Short*";
+            }
+            else if (result.PrimarySignal == "Neutral" && oldPrimarySignal == "Bullish")
+            {
+                title = $"*EXIT SIGNAL: Close Long Position*";
+            }
+            else if (result.PrimarySignal == "Neutral" && oldPrimarySignal == "Bearish")
+            {
+                title = $"*EXIT SIGNAL: Close Short Position*";
+            }
+            else
+            {
+                // This case handles a direct flip (e.g., Bullish to Bearish)
+                // which implies exiting the old position and entering a new one.
+                title = $"*REVERSAL SIGNAL: {result.FinalTradeSignal}*";
+            }
+
+            messageBuilder.AppendLine(title);
             messageBuilder.AppendLine($"Instrument: `{result.Symbol}`");
+            messageBuilder.AppendLine($"LTP: `{result.LTP:N2}`");
             messageBuilder.AppendLine($"Conviction: `{result.ConvictionScore}`");
             messageBuilder.AppendLine();
             messageBuilder.AppendLine("*Market Narrative:*");
@@ -68,6 +96,7 @@ namespace TradingConsole.Wpf.Services
             await SendTelegramMessageAsync(messageBuilder.ToString());
         }
 
+
         /// <summary>
         /// Sends a message to the Telegram Bot API.
         /// </summary>
@@ -78,7 +107,7 @@ namespace TradingConsole.Wpf.Services
             var chatId = _settingsViewModel.TelegramChatId;
 
             // The URL for the sendMessage method of the Telegram Bot API
-            var url = $"https://api.telegram.org/bot{botToken}/sendMessage";
+            var url = $"[https://api.telegram.org/bot](https://api.telegram.org/bot){botToken}/sendMessage";
 
             // The content of the message
             var payload = new

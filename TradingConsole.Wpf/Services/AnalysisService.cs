@@ -1308,6 +1308,12 @@ namespace TradingConsole.Wpf.Services
 
         private void SynthesizeTradeSignal(AnalysisResult result)
         {
+            // --- FIX #1: Only run signal synthesis for Indices ---
+            if (result.InstrumentGroup != "Indices")
+            {
+                return;
+            }
+
             var context = DetermineIntradayContext(result);
             result.IntradayContext = context;
 
@@ -1323,15 +1329,23 @@ namespace TradingConsole.Wpf.Services
             else if (conviction <= -3) playbook = "Moderate Bearish Conviction";
             else playbook = "Neutral / Observe";
 
+            // --- FIX #2: Use a more stable signal for notifications ---
+            string newPrimarySignal;
+            if (conviction >= 3) newPrimarySignal = "Bullish";
+            else if (conviction <= -3) newPrimarySignal = "Bearish";
+            else newPrimarySignal = "Neutral";
 
-            string oldSignal = result.FinalTradeSignal;
+            string oldPrimarySignal = result.PrimarySignal;
+            result.PrimarySignal = newPrimarySignal;
             result.FinalTradeSignal = playbook;
             result.MarketNarrative = GenerateMarketNarrative(result);
 
-            if (result.FinalTradeSignal != oldSignal)
+            // --- MODIFIED: Change the notification condition to include exits ---
+            if (result.PrimarySignal != oldPrimarySignal)
             {
                 _signalLoggerService.LogSignal(result);
-                Task.Run(() => _notificationService.SendTelegramSignalAsync(result));
+                // Pass the old signal to the notification service
+                Task.Run(() => _notificationService.SendTelegramSignalAsync(result, oldPrimarySignal));
             }
         }
 
