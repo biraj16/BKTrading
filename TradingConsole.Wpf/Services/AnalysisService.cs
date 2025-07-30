@@ -295,7 +295,28 @@ namespace TradingConsole.Wpf.Services
 
             var state = _relativeStrengthStates[spotIndex.SecurityId];
 
-            var future = _instrumentCache.Values.FirstOrDefault(i => i.IsFuture && i.UnderlyingSymbol == spotIndex.Symbol);
+            // --- CORRECTED LOGIC START ---
+            // This logic is now more robust. It explicitly checks for the known index-future pairs.
+            var future = _instrumentCache.Values.FirstOrDefault(i =>
+            {
+                if (!i.IsFuture || string.IsNullOrEmpty(i.UnderlyingSymbol))
+                    return false;
+
+                var futureUnderlying = i.UnderlyingSymbol.ToUpperInvariant();
+                var indexSymbol = spotIndex.Symbol;
+
+                if (indexSymbol == "Nifty 50" && futureUnderlying == "NIFTY")
+                    return true;
+                if (indexSymbol == "Nifty Bank" && futureUnderlying == "BANKNIFTY")
+                    return true;
+                if (indexSymbol == "Sensex" && futureUnderlying == "SENSEX")
+                    return true;
+
+                // Fallback for any other potential index futures
+                return indexSymbol.Replace(" ", "").ToUpperInvariant().Contains(futureUnderlying);
+            });
+            // --- CORRECTED LOGIC END ---
+
             if (future == null || future.Open == 0 || spotIndex.Open == 0) return "Futures Not Found";
 
             decimal spotChange = (spotIndex.LTP - spotIndex.Open) / spotIndex.Open;
@@ -945,7 +966,7 @@ namespace TradingConsole.Wpf.Services
                     Low = instrument.LTP,
                     Close = instrument.LTP,
                     Volume = instrument.LastTradedQuantity,
-                    OpenInterest = instrument.OpenInterest,
+                    OpenInterest = (long)instrument.OpenInterest,
                     CumulativePriceVolume = instrument.AvgTradePrice * instrument.LastTradedQuantity,
                     CumulativeVolume = instrument.LastTradedQuantity,
                     Vwap = instrument.AvgTradePrice
@@ -969,7 +990,7 @@ namespace TradingConsole.Wpf.Services
                 currentCandle.Low = Math.Min(currentCandle.Low, instrument.LTP);
                 currentCandle.Close = instrument.LTP;
                 currentCandle.Volume += instrument.LastTradedQuantity;
-                currentCandle.OpenInterest = instrument.OpenInterest;
+                currentCandle.OpenInterest = (long)instrument.OpenInterest;
                 currentCandle.CumulativePriceVolume += instrument.AvgTradePrice * instrument.LastTradedQuantity;
                 currentCandle.CumulativeVolume += instrument.LastTradedQuantity;
                 currentCandle.Vwap = (currentCandle.CumulativeVolume > 0)
@@ -992,7 +1013,26 @@ namespace TradingConsole.Wpf.Services
             DashboardInstrument instrumentForVolume = instrument;
             if (instrument.InstrumentType == "INDEX")
             {
-                var future = _instrumentCache.Values.FirstOrDefault(i => i.IsFuture && i.UnderlyingSymbol == instrument.Symbol);
+                // --- CORRECTED LOGIC START ---
+                var future = _instrumentCache.Values.FirstOrDefault(i =>
+                {
+                    if (!i.IsFuture || string.IsNullOrEmpty(i.UnderlyingSymbol))
+                        return false;
+
+                    var futureUnderlying = i.UnderlyingSymbol.ToUpperInvariant();
+                    var indexSymbol = instrument.Symbol;
+
+                    if (indexSymbol == "Nifty 50" && futureUnderlying == "NIFTY")
+                        return true;
+                    if (indexSymbol == "Nifty Bank" && futureUnderlying == "BANKNIFTY")
+                        return true;
+                    if (indexSymbol == "Sensex" && futureUnderlying == "SENSEX")
+                        return true;
+
+                    return indexSymbol.Replace(" ", "").ToUpperInvariant().Contains(futureUnderlying);
+                });
+                // --- CORRECTED LOGIC END ---
+
                 if (future != null)
                 {
                     instrumentForVolume = future;
@@ -1195,9 +1235,9 @@ namespace TradingConsole.Wpf.Services
             }
 
             var lastCallIv = state.CallIvHistory.Last();
-            var prevCallIv = state.CallIvHistory[^1];
+            var prevCallIv = state.CallIvHistory[^2];
             var lastPutIv = state.PutIvHistory.Last();
-            var prevPutIv = state.PutIvHistory[^1];
+            var prevPutIv = state.PutIvHistory[^2];
             var oneMinCandles = GetCandles(indexInstrument.SecurityId, TimeSpan.FromMinutes(1));
             var anchoredVwap = oneMinCandles?.LastOrDefault()?.AnchoredVwap ?? 0;
 

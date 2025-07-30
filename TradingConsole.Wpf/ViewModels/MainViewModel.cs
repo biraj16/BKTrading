@@ -1033,8 +1033,7 @@ namespace TradingConsole.Wpf.ViewModels
                 {
                     if (string.IsNullOrEmpty(packet.SecurityId)) continue;
 
-                    DashboardInstrument? instrumentToUpdate = null;
-                    if (_dashboardInstrumentMap.TryGetValue(packet.SecurityId, out instrumentToUpdate))
+                    if (_dashboardInstrumentMap.TryGetValue(packet.SecurityId, out var instrumentToUpdate))
                     {
                         instrumentToUpdate.LTP = packet.LastPrice;
                         instrumentToUpdate.Open = packet.Open;
@@ -1051,40 +1050,56 @@ namespace TradingConsole.Wpf.ViewModels
                             instrumentToUpdate.ImpliedVolatility = cachedOptionData.ImpliedVolatility;
                         }
 
-                        decimal underlyingLtp = this.UnderlyingPrice;
-                        if (!string.IsNullOrEmpty(instrumentToUpdate.UnderlyingSymbol))
+                        // --- CORRECTED LOGIC START ---
+                        decimal underlyingLtp = 0;
+                        if (instrumentToUpdate.InstrumentType.StartsWith("OPT") || instrumentToUpdate.InstrumentType.StartsWith("FUT"))
                         {
-                            var underlyingInstrument = Dashboard.MonitoredInstruments.FirstOrDefault(i => i.Symbol == instrumentToUpdate.UnderlyingSymbol || i.DisplayName == instrumentToUpdate.UnderlyingSymbol);
-                            if (underlyingInstrument != null && underlyingInstrument.LTP > 0)
+                            // Robust lookup for underlying instrument
+                            var underlyingInstrument = Dashboard.MonitoredInstruments.FirstOrDefault(i =>
+                                (i.InstrumentType == "INDEX" || i.InstrumentType == "EQUITY") &&
+                                i.UnderlyingSymbol.Replace(" ", "").Equals(instrumentToUpdate.UnderlyingSymbol.Replace(" ", ""), StringComparison.OrdinalIgnoreCase));
+
+                            if (underlyingInstrument != null)
                             {
                                 underlyingLtp = underlyingInstrument.LTP;
                             }
                         }
-                        _analysisService.OnInstrumentDataReceived(instrumentToUpdate, underlyingLtp);
-                    }
+                        else // For stocks and indices
+                        {
+                            underlyingLtp = instrumentToUpdate.LTP;
+                        }
 
-                    if (SelectedIndex != null && SelectedIndex.ScripId == packet.SecurityId)
-                    {
-                        UnderlyingPrice = packet.LastPrice;
-                    }
+                        if (underlyingLtp > 0)
+                        {
+                            _analysisService.OnInstrumentDataReceived(instrumentToUpdate, underlyingLtp);
+                        }
+                        // --- CORRECTED LOGIC END ---
 
-                    if (_optionScripMap.TryGetValue(packet.SecurityId, out var optionDetails))
-                    {
-                        optionDetails.LTP = packet.LastPrice;
-                        optionDetails.Volume = packet.Volume;
-                    }
 
-                    if (instrumentToUpdate != null && instrumentToUpdate.SegmentId == 0 && !_dashboardOptionsLoadedFor.Contains(packet.SecurityId))
-                    {
-                        _dashboardOptionsLoadedFor.Add(packet.SecurityId);
-                        _ = LoadDashboardOptionsForIndexAsync(instrumentToUpdate, packet.LastPrice);
-                    }
+                        if (SelectedIndex != null && SelectedIndex.ScripId == packet.SecurityId)
+                        {
+                            UnderlyingPrice = packet.LastPrice;
+                        }
 
-                    if (_openPositionsMap.TryGetValue(packet.SecurityId, out var openPositionToUpdate))
-                    {
-                        openPositionToUpdate.LastTradedPrice = packet.LastPrice;
+                        if (_optionScripMap.TryGetValue(packet.SecurityId, out var optionDetails))
+                        {
+                            optionDetails.LTP = packet.LastPrice;
+                            optionDetails.Volume = packet.Volume;
+                        }
+
+                        if (instrumentToUpdate != null && instrumentToUpdate.SegmentId == 0 && !_dashboardOptionsLoadedFor.Contains(packet.SecurityId))
+                        {
+                            _dashboardOptionsLoadedFor.Add(packet.SecurityId);
+                            _ = LoadDashboardOptionsForIndexAsync(instrumentToUpdate, packet.LastPrice);
+                        }
+
+                        if (_openPositionsMap.TryGetValue(packet.SecurityId, out var openPositionToUpdate))
+                        {
+                            openPositionToUpdate.LastTradedPrice = packet.LastPrice;
+                        }
                     }
                 }
+
 
                 foreach (var packet in oiUpdates)
                 {
@@ -1494,34 +1509,52 @@ namespace TradingConsole.Wpf.ViewModels
                     }
                 }
 
+                // --- CORRECTED LOGIC START ---
                 await Application.Current.Dispatcher.InvokeAsync(() => {
                     foreach (var instrument in Dashboard.MonitoredInstruments)
                     {
+                        // This block handles options specifically to add IV data
                         if (_optionChainCache.TryGetValue(instrument.SecurityId, out var cachedData))
                         {
                             instrument.ImpliedVolatility = cachedData.ImpliedVolatility;
+                        }
 
-                            decimal underlyingLtp = 0;
-                            if (!string.IsNullOrEmpty(instrument.UnderlyingSymbol))
+                        // This block sends data for analysis for ALL instrument types
+                        decimal underlyingLtp = 0;
+                        if (instrument.InstrumentType.StartsWith("OPT") || instrument.InstrumentType.StartsWith("FUT"))
+                        {
+                            var underlyingInstrument = Dashboard.MonitoredInstruments.FirstOrDefault(i =>
                             {
-                                var underlyingInstrument = Dashboard.MonitoredInstruments.FirstOrDefault(i => i.Symbol == instrument.UnderlyingSymbol || i.DisplayName == instrument.UnderlyingSymbol);
-                                if (underlyingInstrument != null)
-                                {
-                                    underlyingLtp = underlyingInstrument.LTP;
-                                }
-                            }
+                                if (i.InstrumentType != "INDEX" && i.InstrumentType != "EQUITY") return false;
 
-                            if (instrument.InstrumentType.StartsWith("OPT") && underlyingLtp > 0)
+                                var derivativeUnderlying = instrument.UnderlyingSymbol.ToUpperInvariant();
+                                var potentialUnderlyingSymbol = i.Symbol;
+
+                                if (potentialUnderlyingSymbol == "Nifty 50" && derivativeUnderlying == "NIFTY") return true;
+                                if (potentialUnderlyingSymbol == "Nifty Bank" && derivativeUnderlying == "BANKNIFTY") return true;
+                                if (potentialUnderlyingSymbol == "Sensex" && derivativeUnderlying == "SENSEX") return true;
+
+                                // Fallback for stock derivatives
+                                return potentialUnderlyingSymbol.Replace(" ", "").ToUpperInvariant().Contains(derivativeUnderlying);
+                            });
+
+                            if (underlyingInstrument != null)
                             {
-                                _analysisService.OnInstrumentDataReceived(instrument, underlyingLtp);
+                                underlyingLtp = underlyingInstrument.LTP;
                             }
-                            else if (!instrument.InstrumentType.StartsWith("OPT"))
-                            {
-                                _analysisService.OnInstrumentDataReceived(instrument, instrument.LTP);
-                            }
+                        }
+                        else // For EQ and INDEX
+                        {
+                            underlyingLtp = instrument.LTP;
+                        }
+
+                        if (underlyingLtp > 0)
+                        {
+                            _analysisService.OnInstrumentDataReceived(instrument, underlyingLtp);
                         }
                     }
                 });
+                // --- CORRECTED LOGIC END ---
 
                 await UpdateStatusAsync("IV cache refresh complete.");
             }
