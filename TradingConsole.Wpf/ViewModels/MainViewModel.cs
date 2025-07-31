@@ -1,6 +1,4 @@
-﻿// In TradingConsole.Wpf/ViewModels/MainViewModel.cs
-
-using System;
+﻿using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -49,6 +47,8 @@ namespace TradingConsole.Wpf.ViewModels
         private readonly SignalLoggerService _signalLoggerService;
         private readonly NotificationService _notificationService;
         private readonly PerformanceService _performanceService;
+        // --- ADDED: Field for the new AutoTraderService ---
+        private readonly AutoTraderService _autoTraderService;
         private readonly string _dhanClientId;
         private Timer? _optionChainRefreshTimer;
         private Timer? _ivRefreshTimer;
@@ -94,6 +94,7 @@ namespace TradingConsole.Wpf.ViewModels
         public SettingsViewModel Settings { get; }
         public AnalysisTabViewModel AnalysisTab { get; }
         public TradeSignalViewModel TradeSignalTab { get; }
+        public string DhanClientId => _dhanClientId; // Expose DhanClientId for AutoTraderService
 
         public ObservableCollection<OptionChainRow> OptionChainRows { get; }
         public ObservableCollection<TickerIndex> Indices { get; }
@@ -203,8 +204,11 @@ namespace TradingConsole.Wpf.ViewModels
             _performanceService = new PerformanceService(Portfolio);
 
             _analysisService = new AnalysisService(Settings, _apiClient, _scripMasterService, _historicalIvService, _marketProfileService, _indicatorStateService, _signalLoggerService, _notificationService, Dashboard);
-            _analysisService.OnAnalysisUpdated += OnAnalysisResultUpdated;
 
+            // --- MODIFIED: Subscribe the AutoTraderService to the analysis updates ---
+            _autoTraderService = new AutoTraderService(this, _scripMasterService, _apiClient, Settings, _notificationService);
+            _analysisService.OnAnalysisUpdated += OnAnalysisResultUpdated;
+            _analysisService.OnAnalysisUpdated += _autoTraderService.OnAnalysisResultReceived; // Subscribe AutoTrader
 
             Dashboard.MonitoredInstruments.CollectionChanged += (s, e) => RebuildDashboardMap();
             Portfolio.OpenPositions.CollectionChanged += (s, e) => RebuildPositionsMap();
@@ -1396,12 +1400,12 @@ namespace TradingConsole.Wpf.ViewModels
                         var inst = new DashboardInstrument
                         {
                             Symbol = peInfo.SemInstrumentName,
-                            DisplayName = peInfo.SemInstrumentName,
+                            DisplayName = ceInfo.SemInstrumentName,
                             SecurityId = peInfo.SecurityId,
                             FeedType = FeedTypeQuote,
                             SegmentId = optionSegmentId,
                             UnderlyingSymbol = indexInstrument.Symbol,
-                            InstrumentType = peInfo.InstrumentType
+                            InstrumentType = ceInfo.InstrumentType
                         };
                         newOptionInstruments.Add(inst);
                         newSubscriptions[inst.SecurityId] = inst.SegmentId;
@@ -1692,7 +1696,7 @@ namespace TradingConsole.Wpf.ViewModels
             MaxOiChange = Math.Max(maxCallOiChange, maxPutOiChange);
         }
 
-        private Task UpdateStatusAsync(string message)
+        public Task UpdateStatusAsync(string message)
         {
             return Application.Current?.Dispatcher.InvokeAsync(() =>
             {

@@ -1,5 +1,4 @@
-﻿// In TradingConsole.Wpf/Services/NotificationService.cs
-using System;
+﻿using System;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
@@ -101,13 +100,13 @@ namespace TradingConsole.Wpf.Services
         /// Sends a message to the Telegram Bot API.
         /// </summary>
         /// <param name="message">The message content, supporting Markdown.</param>
-        private async Task SendTelegramMessageAsync(string message)
+        public async Task SendTelegramMessageAsync(string message)
         {
             var botToken = _settingsViewModel.TelegramBotToken;
             var chatId = _settingsViewModel.TelegramChatId;
 
             // The URL for the sendMessage method of the Telegram Bot API
-            var url = $"[https://api.telegram.org/bot](https://api.telegram.org/bot){botToken}/sendMessage";
+            var url = $"https://api.telegram.org/bot{botToken}/sendMessage";
 
             // The content of the message
             var payload = new

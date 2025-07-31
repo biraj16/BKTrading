@@ -1,5 +1,4 @@
-﻿// In TradingConsole.Wpf/ViewModels/SettingsViewModel.cs
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -124,6 +123,14 @@ namespace TradingConsole.Wpf.ViewModels
         public string? TelegramChatId { get => _telegramChatId; set { if (_telegramChatId != value) { _telegramChatId = value; OnPropertyChanged(); } } }
         #endregion
 
+        #region Automation Settings
+        private AutomationSettings _automationSettings = new AutomationSettings();
+        public AutomationSettings AutomationSettings
+        {
+            get => _automationSettings;
+            set { _automationSettings = value; OnPropertyChanged(); }
+        }
+        #endregion
 
         private StrategySettings _strategy = new StrategySettings();
         public StrategySettings Strategy { get => _strategy; set { _strategy = value; OnPropertyChanged(); } }
@@ -218,6 +225,8 @@ namespace TradingConsole.Wpf.ViewModels
 
             Strategy = _settings.Strategy ?? new StrategySettings();
 
+            // --- ADDED: Load Automation Settings ---
+            AutomationSettings = _settings.AutomationSettings ?? new AutomationSettings();
 
             MarketHolidays.Clear();
             var loadedHolidays = _settings.MarketHolidays ?? new List<DateTime>();
@@ -288,6 +297,9 @@ namespace TradingConsole.Wpf.ViewModels
             _settings.MaxDailyLossLimit = MaxDailyLossLimit;
 
             _settings.Strategy = this.Strategy;
+
+            // --- ADDED: Save Automation Settings ---
+            _settings.AutomationSettings = this.AutomationSettings;
 
             // --- NEW: Save Notification settings ---
             _settings.IsTelegramNotificationEnabled = IsTelegramNotificationEnabled;

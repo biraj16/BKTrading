@@ -1,8 +1,8 @@
-﻿// In TradingConsole.Core/Models/AppSettings.cs
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Runtime.CompilerServices;
+using System.Text.Json.Serialization;
 
 namespace TradingConsole.Core.Models
 {
@@ -132,6 +132,39 @@ namespace TradingConsole.Core.Models
         }
     }
 
+    /// <summary>
+    /// Holds all settings related to trade automation.
+    /// </summary>
+    public class AutomationSettings : ObservableModel
+    {
+        private bool _isAutomationEnabled;
+        public bool IsAutomationEnabled { get => _isAutomationEnabled; set => SetProperty(ref _isAutomationEnabled, value); }
+
+        private string _selectedAutoTradeIndex = "Nifty 50"; // Default to Nifty 50
+        public string SelectedAutoTradeIndex { get => _selectedAutoTradeIndex; set => SetProperty(ref _selectedAutoTradeIndex, value); }
+
+        [JsonIgnore] // This doesn't need to be saved in the settings file
+        public List<string> AutoTradeableIndices { get; } = new List<string> { "Nifty 50", "Nifty Bank", "Sensex" };
+
+        private int _lotsPerTrade = 1;
+        public int LotsPerTrade { get => _lotsPerTrade; set => SetProperty(ref _lotsPerTrade, value); }
+
+        private decimal _stopLossPoints = 10;
+        public decimal StopLossPoints { get => _stopLossPoints; set => SetProperty(ref _stopLossPoints, value); }
+
+        private decimal _targetPoints = 20;
+        public decimal TargetPoints { get => _targetPoints; set => SetProperty(ref _targetPoints, value); }
+
+        private bool _isTrailingEnabled;
+        public bool IsTrailingEnabled { get => _isTrailingEnabled; set => SetProperty(ref _isTrailingEnabled, value); }
+
+        private decimal _trailingStopLossJump = 5;
+        public decimal TrailingStopLossJump { get => _trailingStopLossJump; set => SetProperty(ref _trailingStopLossJump, value); }
+
+        private int _minConvictionScore = 7;
+        public int MinConvictionScore { get => _minConvictionScore; set => SetProperty(ref _minConvictionScore, value); }
+    }
+
 
     public class IndexLevels
     {
@@ -172,6 +205,9 @@ namespace TradingConsole.Core.Models
         public decimal MaxDailyLossLimit { get; set; }
 
         public StrategySettings Strategy { get; set; }
+
+        // --- ADDED: New property for Automation Settings ---
+        public AutomationSettings AutomationSettings { get; set; }
 
         public bool IsTelegramNotificationEnabled { get; set; }
         public string? TelegramBotToken { get; set; }
@@ -254,6 +290,9 @@ namespace TradingConsole.Core.Models
             };
 
             Strategy = new StrategySettings();
+
+            // --- ADDED: Initialize Automation Settings with defaults ---
+            AutomationSettings = new AutomationSettings();
 
             IsTelegramNotificationEnabled = false;
             TelegramBotToken = string.Empty;
